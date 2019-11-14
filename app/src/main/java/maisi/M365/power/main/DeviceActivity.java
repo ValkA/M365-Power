@@ -4,6 +4,8 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.AudioManager;
+import android.media.SoundPool;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -773,5 +775,39 @@ public class DeviceActivity extends AppCompatActivity
     }
 
 
+    int streamId;
+    SoundPool soundPool;
 
+    float lastVolume = 0.5f;
+    float lastRate = 0.5f;
+    float alpha = 0.05f;
+    Disposable d;
+    @Override
+    protected void onResume() {
+        soundPool = new SoundPool(5, AudioManager.STREAM_MUSIC, 0);
+        soundPool.setOnLoadCompleteListener((soundPool, sampleId, arg2) -> streamId = soundPool.play(sampleId, 1.0f, 1.0f, 1, -1, 1.0f));
+        int soundId1 = soundPool.load(getApplicationContext(), R.raw.engine, 1);
+
+        d = Observable.interval(1000, 10, TimeUnit.MILLISECONDS)
+                .subscribeOn(AndroidSchedulers.mainThread())
+                .subscribe((time)->{
+                    float volume = Math.max(0.5f, Math.min(1f, 0.5f+(float)Statistics.getPower()/20f));
+                    lastVolume = lastVolume*(1f-alpha) + volume*alpha;
+                    soundPool.setVolume(streamId, lastVolume, lastVolume);
+
+                    float rate = Math.max(0.5f, Math.min(2f, 0.5f+(float)Statistics.getCurrentSpeed()/10f));
+                    lastRate = lastRate*(1f-alpha) + rate*alpha;
+                    soundPool.setRate(streamId, lastRate);
+        });
+
+        super.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        d.dispose();
+        soundPool.release();
+        soundPool = null;
+        super.onPause();
+    }
 }
